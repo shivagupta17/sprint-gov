@@ -1,0 +1,15 @@
+{
+  "scope": "x_snc_sprint_gov",
+  "scopeId": "c1cbfc08a27a621f325a5a59631354e9",
+  "name": "Sprint Governance",
+  "metadataDir": "src/plugin-xmls",
+  "appOutputDir": "dist-metadata/app",
+  "packageSourceCodeOnInstance": true,
+  "staticContent": {
+    "assets": {
+      "./public/**": {
+        "publicPath": "[$config.aiux.basename]/public"
+      }
+    }
+  }
+}

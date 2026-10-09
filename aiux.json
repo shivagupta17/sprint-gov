@@ -1,0 +1,11 @@
+{
+  "name": "Sprint Governance",
+  "basename": "sprint-gov",
+  "landing": "/home",
+  "development": {
+    "token": ""
+  },
+  "build": {
+    "exclude": ["**/*.test.js", "**/test/**"]
+  }
+}
