@@ -40,6 +40,13 @@ export default function server(data, _options, input) {
       return;
     }
 
+    if (action === 'update_capacity') {
+      updateSprintCapacity(input && input.sysId, input && input.teamPoints, groups);
+      data.groups = groupList(groups);
+      data.sprints = listSprints(groupIds);
+      return;
+    }
+
     fail('Unsupported sprint action.');
   } catch (error) {
     data.isError = true;
@@ -243,6 +250,28 @@ export default function server(data, _options, input) {
     }
 
     if (!sprint.update()) fail(gs.getMessage('Sprint status could not be updated.'));
+  }
+
+  function updateSprintCapacity(sysId, value, groupMap) {
+    if (!sysId || !/^[0-9a-f]{32}$/i.test(String(sysId))) fail(gs.getMessage('Select a valid sprint.'));
+    var points = Number(value);
+    if (value === null || value === undefined || String(value).replace(/^\s+|\s+$/g, '') === '' || !isFinite(points) || points < 0) {
+      fail(gs.getMessage('Enter a valid non-negative group capacity.'));
+    }
+
+    var sprint = new GlideRecordSecure('rm_sprint');
+    if (!sprint.get(String(sysId)) || !sprint.canRead() || !sprint.canWrite()) {
+      fail(gs.getMessage('Sprint not found or you do not have permission to update it.'));
+    }
+    var groupId = sprint.getValue('assignment_group');
+    if (!groupMap[groupId]) fail(gs.getMessage('You can only manage sprints for an Agile Team group you belong to.'));
+    if (sprint.getValue('state') !== '-6') fail(gs.getMessage('Group capacity points can only be changed while the sprint is Draft.'));
+    if (!sprint.isValidField('team_points') || !sprint.getElement('team_points').canWrite()) {
+      fail(gs.getMessage('You do not have permission to update group capacity points.'));
+    }
+
+    sprint.setValue('team_points', String(points));
+    if (!sprint.update()) fail(gs.getMessage('Group capacity points could not be updated.'));
   }
 
   function dateTime(localDateTime) {

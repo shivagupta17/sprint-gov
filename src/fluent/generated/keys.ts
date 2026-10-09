@@ -66,6 +66,7 @@ declare global {
                     'aiux-widget|aiux-hello-world': {
                         table: 'sys_aix_widget'
                         id: '5f26c8896c469d5d372916fdafd68bbf'
+                        deleted: true
                     }
                     'aiux-widget|aiux-sprint-management': {
                         table: 'sys_aix_widget'

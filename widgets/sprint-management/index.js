@@ -5,6 +5,8 @@ import {
   decorators
 } from '@servicenow/aiux/aiux-components-core';
 import {i18n} from '@servicenow/aiux/aiux-services';
+import {icon} from '@servicenow/aiux/aiux-directive-icon';
+import {tooltip} from '@servicenow/aiux/aiux-directive-tooltip';
 import '@servicenow/aiux/aiux-components-pagination';
 
 const {name, description, bestFor, discoverable, server} = decorators;
@@ -35,6 +37,7 @@ export default class SprintManagement extends AIUXWidgetElement {
   @state() loading = true;
   @state() creating = false;
   @state() actionId = '';
+  @state() editingCapacityId = '';
   @state() error = '';
   @state() notice = '';
   @state() hasMore = false;
@@ -238,6 +241,45 @@ export default class SprintManagement extends AIUXWidgetElement {
     }
   }
 
+  async updateCapacity(event) {
+    const button = event.currentTarget;
+    const sysId = button.dataset.id;
+    const input = button.closest('td')?.querySelector('input');
+    const teamPoints = input?.value;
+    if (!sysId || !input || this.actionId) return;
+    if (teamPoints.trim() === '' || !Number.isFinite(Number(teamPoints)) || Number(teamPoints) < 0) {
+      this.error = i18n.getMessage('Enter a valid non-negative group capacity.');
+      return;
+    }
+
+    this.actionId = sysId;
+    this.error = '';
+    this.notice = '';
+    try {
+      const response = await this.server.get({action: 'update_capacity', sysId, teamPoints});
+      this.sprints = response.sprints || this.sprints;
+      this.hasMore = Boolean(response.hasMore);
+      if (response?.isError) throw new Error(response.errorMessage || i18n.getMessage('Group capacity points could not be updated.'));
+      this.notice = i18n.getMessage('Group capacity points updated.');
+      this.editingCapacityId = '';
+    } catch (error) {
+      this.error = error?.message || i18n.getMessage('Group capacity points could not be updated.');
+    } finally {
+      this.actionId = '';
+    }
+  }
+
+  async beginCapacityEdit(sysId) {
+    if (this.actionId) return;
+    this.editingCapacityId = sysId;
+    await this.updateComplete;
+    this.renderRoot.querySelector(`input[data-capacity-input="${sysId}"]`)?.focus();
+  }
+
+  cancelCapacityEdit() {
+    this.editingCapacityId = '';
+  }
+
   formatDate(value) {
     const iso = (value || '').slice(0, 10);
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
@@ -379,10 +421,14 @@ export default class SprintManagement extends AIUXWidgetElement {
                       <td><time>${sprint.start_date}</time></td>
                       <td><time>${sprint.end_date}</time></td>
                       <td><span class="aiux-badge aiux-badge-md ${this.statusClass(sprint.state)} aiux-badge-outline text-sm">${sprint.state_label}</span></td>
-                      <td>${sprint.team_points}</td>
-                      <td>${sprint.committed_points}</td>
-                      <td>${sprint.story_points}</td>
-                      <td>${sprint.actual_points}</td>
+                      <td class="text-center align-middle tabular-nums">${sprint.state === '-6'
+                        ? this.editingCapacityId === sprint.sys_id
+                          ? html`<div class="inline-flex min-w-36 items-center justify-center gap-2"><input class="aiux-input aiux-input-bordered aiux-input-sm w-24 text-center tabular-nums" type="number" min="0" step="any" .value=${sprint.team_points} data-capacity-input=${sprint.sys_id} aria-label=${i18n.getMessage('Group capacity points for {0}', [sprint.name])} ?disabled=${Boolean(this.actionId)} /><button class="aiux-btn aiux-btn-light aiux-btn-sm aiux-btn-circle" type="button" data-id=${sprint.sys_id} aria-label=${i18n.getMessage('Save group capacity points for {0}', [sprint.name])} ${tooltip({content: i18n.getMessage('Save capacity points')})} @click=${this.updateCapacity} ?disabled=${Boolean(this.actionId)}>${icon({name: 'check-outline', size: 'sm', class: 'text-success'})}</button><button class="aiux-btn aiux-btn-light aiux-btn-sm aiux-btn-circle" type="button" aria-label=${i18n.getMessage('Cancel editing group capacity points for {0}', [sprint.name])} ${tooltip({content: i18n.getMessage('Cancel editing')})} @click=${this.cancelCapacityEdit} ?disabled=${Boolean(this.actionId)}>${icon({name: 'close-outline', size: 'sm', class: 'text-error'})}</button></div>`
+                          : html`<button class="aiux-btn aiux-btn-ghost aiux-btn-sm h-auto min-h-0 px-2 py-0 text-base leading-normal" type="button" aria-label=${i18n.getMessage('Group capacity points for {0}: {1}. Double-click to edit.', [sprint.name, sprint.team_points])} title=${i18n.getMessage('Double-click to edit')} @dblclick=${() => this.beginCapacityEdit(sprint.sys_id)} @keydown=${event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.beginCapacityEdit(sprint.sys_id); } }}>${sprint.team_points}</button>`
+                        : sprint.team_points}</td>
+                      <td class="text-center align-middle tabular-nums">${sprint.committed_points}</td>
+                      <td class="text-center align-middle tabular-nums">${sprint.story_points}</td>
+                      <td class="text-center align-middle tabular-nums">${sprint.actual_points}</td>
                       <td>${sprint.state === '2'
                         ? html`<button class="aiux-btn aiux-btn-primary aiux-btn-md" data-id=${sprint.sys_id} data-action="complete" aria-label=${i18n.getMessage('Complete {0}', [sprint.name])} @click=${this.changeState} ?disabled=${Boolean(this.actionId)}>${this.actionId === sprint.sys_id ? i18n.getMessage('Saving…') : i18n.getMessage('Complete sprint')}</button>`
                         : sprint.state === '-6' || sprint.state === '1'

@@ -21,3 +21,6 @@ widgets/aiux-studio-preview/
 pages/.widget-sandbox/
 pages/.widget-sandbox-bare/
 # <<< aiux widget sandbox
+
+# Lux Lab screenshots (auto-generated)
+.lux-lab/screenshots/
