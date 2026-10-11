@@ -47,6 +47,15 @@ export default function server(data, _options, input) {
       return;
     }
 
+    if (action === 'get_group_members') {
+      var sprint = new GlideRecordSecure('rm_sprint');
+      if (!sprint.get(input && input.sysId)) fail(gs.getMessage('Sprint not found.'));
+      var sprintGroupId = sprint.getValue('assignment_group');
+      if (!sprintGroupId || !groups[sprintGroupId]) fail(gs.getMessage('Select an Agile Team group you belong to.'));
+      data.members = getGroupMembers(sprintGroupId);
+      return;
+    }
+
     fail('Unsupported sprint action.');
   } catch (error) {
     data.isError = true;
@@ -75,7 +84,7 @@ export default function server(data, _options, input) {
     var result = {};
     var groupId;
     for (groupId in memberIds) {
-      if (!memberIds.hasOwnProperty(groupId)) continue;
+      if (!Object.prototype.hasOwnProperty.call(memberIds, groupId)) continue;
       var group = new GlideRecordSecure('sys_user_group');
       if (!group.get(groupId) || !group.canRead()) continue;
       if (group.getValue('active') !== '1' && group.getValue('active') !== 'true') continue;
@@ -93,7 +102,7 @@ export default function server(data, _options, input) {
     var result = [];
     var id;
     for (id in groupMap) {
-      if (groupMap.hasOwnProperty(id)) result.push(groupMap[id]);
+      if (Object.prototype.hasOwnProperty.call(groupMap, id)) result.push(groupMap[id]);
     }
     result.sort(function (a, b) { return a.name.localeCompare(b.name); });
     return result;
@@ -272,6 +281,30 @@ export default function server(data, _options, input) {
 
     sprint.setValue('team_points', String(points));
     if (!sprint.update()) fail(gs.getMessage('Group capacity points could not be updated.'));
+  }
+
+  function getGroupMembers(groupId) {
+    var members = [];
+    var membership = new GlideRecordSecure('sys_user_grmember');
+    membership.addQuery('group', groupId);
+    membership.addQuery('user.active', 'true');
+    membership.orderBy('user.name');
+    membership.query();
+
+    while (membership.next()) {
+      var points = '';
+      if (membership.isValidField('points')) {
+        var el = membership.getElement('points');
+        if (el && el.canRead()) points = membership.getValue('points') || '';
+      }
+      members.push({
+        sys_id: membership.getUniqueValue(),
+        user_id: membership.getValue('user'),
+        user_name: membership.getDisplayValue('user') || '',
+        average_points: points || '0'
+      });
+    }
+    return members;
   }
 
   function dateTime(localDateTime) {

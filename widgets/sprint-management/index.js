@@ -5,9 +5,11 @@ import {
   decorators
 } from '@servicenow/aiux/aiux-components-core';
 import {i18n} from '@servicenow/aiux/aiux-services';
+import {navigate} from '@servicenow/aiux-client';
 import {icon} from '@servicenow/aiux/aiux-directive-icon';
 import {tooltip} from '@servicenow/aiux/aiux-directive-tooltip';
 import '@servicenow/aiux/aiux-components-pagination';
+import '../../components/calculate-group-capacity/index.js';
 
 const {name, description, bestFor, discoverable, server} = decorators;
 
@@ -276,6 +278,24 @@ export default class SprintManagement extends AIUXWidgetElement {
     this.renderRoot.querySelector(`input[data-capacity-input="${sysId}"]`)?.focus();
   }
 
+  openCapacityContextMenu(event, sprintId) {
+    this.renderRoot.querySelector('aiux-calculate-group-capacity')?.openContextMenu(event, sprintId, true);
+  }
+
+  handleCapacityApplied(event) {
+    const {sprintId, teamPoints, sprints} = event.detail;
+    if (sprints) {
+      this.sprints = sprints;
+    } else {
+      this.sprints = this.sprints.map(s => s.sys_id === sprintId ? {...s, team_points: teamPoints} : s);
+    }
+    this.notice = i18n.getMessage('Group capacity points updated.');
+  }
+
+  openSprint(sysId) {
+    navigate(`/sprint/${encodeURIComponent(sysId)}`);
+  }
+
   cancelCapacityEdit() {
     this.editingCapacityId = '';
   }
@@ -362,7 +382,7 @@ export default class SprintManagement extends AIUXWidgetElement {
             <p class="mt-2 max-w-2xl text-sm text-base-content/70">${i18n.getMessage('Manage sprints for Agile Team groups you belong to.')}</p>
           </div>
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label class="flex flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Agile Team group')}</span><select class="aiux-select aiux-select-bordered aiux-select-md" .value=${this.selectedGroup} @change=${event => { this.selectedGroup = event.currentTarget.value; this.page = 1; }} ?disabled=${this.loading || !this.groups.length}>${this.groups.map(group => html`<option value=${group.sys_id}>${group.name}</option>`)}</select></label>
+            <label class="flex flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Agile Team group')}</span><select class="aiux-select aiux-select-md" .value=${this.selectedGroup} @change=${event => { this.selectedGroup = event.currentTarget.value; this.page = 1; }} ?disabled=${this.loading || !this.groups.length}>${this.groups.map(group => html`<option value=${group.sys_id}>${group.name}</option>`)}</select></label>
             <button class="aiux-btn aiux-btn-primary aiux-btn-md" @click=${this.openCreateDialog} ?disabled=${this.loading || !this.selectedGroup}>${i18n.getMessage('Create sprint')}</button>
             <button class="aiux-btn aiux-btn-secondary aiux-btn-sm" @click=${this.load} ?disabled=${this.loading}>${i18n.getMessage('Refresh')}</button>
           </div>
@@ -374,16 +394,23 @@ export default class SprintManagement extends AIUXWidgetElement {
         ${this.createOpen ? html`
           <aiux-modal .open=${this.createOpen} size="lg" @aiux-modal:close=${() => { this.createOpen = false; }}>
             <span slot="header">${i18n.getMessage('Create sprint')}</span>
-            <form id="sprint-create-form" class="flex flex-col gap-5 p-1" @submit=${this.create}>
+            <form id="sprint-create-form" aria-label=${i18n.getMessage('Create sprint form')} class="flex flex-col gap-5 p-1" @submit=${this.create}>
                 <p class="text-sm text-base-content/70">${i18n.getMessage('Sprints will be created for {0}.', [this.groups.find(group => group.sys_id === this.selectedGroup)?.name || ''])}</p>
                 ${this.error ? html`<div class="aiux-alert aiux-alert-error" role="alert"><span>${this.error}</span></div>` : ''}
-                ${this.defaultsLoading ? html`<div class="flex items-center gap-3" role="status"><span class="aiux-loading aiux-loading-spinner aiux-loading-sm" aria-hidden="true"></span>${i18n.getMessage('Loading sprint defaults…')}</div>` : html`
+                ${this.defaultsLoading ? html`<div class="grid grid-cols-1 gap-4 sm:grid-cols-2" role="status" aria-label=${i18n.getMessage('Loading sprint defaults…')}>
+                  <div class="flex flex-col gap-2"><div class="aiux-skeleton h-4 w-20 rounded"></div><div class="aiux-skeleton h-10 w-full rounded"></div></div>
+                  <div class="flex flex-col gap-2"><div class="aiux-skeleton h-4 w-28 rounded"></div><div class="aiux-skeleton h-10 w-full rounded"></div></div>
+                  <div class="flex flex-col gap-2"><div class="aiux-skeleton h-4 w-36 rounded"></div><div class="aiux-skeleton h-10 w-full rounded"></div></div>
+                  <div class="flex flex-col gap-2"><div class="aiux-skeleton h-4 w-28 rounded"></div><div class="aiux-skeleton h-10 w-full rounded"></div></div>
+                  <div class="flex flex-col gap-2 sm:col-span-2"><div class="aiux-skeleton h-4 w-32 rounded"></div><div class="aiux-skeleton h-10 w-full rounded"></div></div>
+                  <span class="sr-only">${i18n.getMessage('Loading sprint defaults…')}</span>
+                </div>` : html`
                   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <label class="flex flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Name')}</span><input class="aiux-input aiux-input-bordered aiux-input-md" .value=${this.name} @input=${event => { this.name = event.currentTarget.value; }} maxlength="150" required /></label>
-                    <label class="flex flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Starting number')}</span><input class="aiux-input aiux-input-bordered aiux-input-md" type="number" min="1" step="1" .value=${this.startingNumber} @input=${event => { this.startingNumber = event.currentTarget.value; }} /></label>
-                    <label class="flex flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Start date and time')}</span><input class="aiux-input aiux-input-bordered aiux-input-md" type="datetime-local" step="1" .value=${this.toDateTimeInputValue(this.startDate)} @input=${event => { this.startDate = event.currentTarget.value; }} required /></label>
-                    <label class="flex flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Duration (days)')}</span><input class="aiux-input aiux-input-bordered aiux-input-md" type="number" min="1" max="365" step="1" .value=${this.duration} @input=${event => { this.duration = event.currentTarget.value; }} required /></label>
-                    <label class="flex flex-col gap-1 sm:col-span-2"><span class="text-sm font-medium">${i18n.getMessage('Number of sprints')}</span><input class="aiux-input aiux-input-bordered aiux-input-md" type="number" min="1" max="100" step="1" .value=${this.sprintCount} @input=${event => { this.sprintCount = event.currentTarget.value; }} required /><span class="text-xs text-base-content/60">${i18n.getMessage('Additional sprints use consecutive numbers and dates based on the duration.')}</span></label>
+                    <label class="flex flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Name')}</span><input class="aiux-input aiux-input-md" .value=${this.name} @input=${event => { this.name = event.currentTarget.value; }} maxlength="150" required /></label>
+                    <label class="flex flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Starting number')}</span><input class="aiux-input aiux-input-md" type="number" min="1" step="1" .value=${this.startingNumber} @input=${event => { this.startingNumber = event.currentTarget.value; }} /></label>
+                    <label class="flex flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Start date and time')}</span><input class="aiux-input aiux-input-md" type="datetime-local" step="1" .value=${this.toDateTimeInputValue(this.startDate)} @input=${event => { this.startDate = event.currentTarget.value; }} required /></label>
+                    <label class="flex flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Duration (days)')}</span><input class="aiux-input aiux-input-md" type="number" min="1" max="365" step="1" .value=${this.duration} @input=${event => { this.duration = event.currentTarget.value; }} required /></label>
+                    <label class="flex flex-col gap-1 sm:col-span-2"><span class="text-sm font-medium">${i18n.getMessage('Number of sprints')}</span><input class="aiux-input aiux-input-md" type="number" min="1" max="100" step="1" .value=${this.sprintCount} @input=${event => { this.sprintCount = event.currentTarget.value; }} required /><span class="text-xs text-base-content/60">${i18n.getMessage('Additional sprints use consecutive numbers and dates based on the duration.')}</span></label>
                   </div>`}
                 ${schedulePreview.length ? html`
                   <section aria-labelledby="schedule-preview-heading" class="flex flex-col gap-2">
@@ -406,10 +433,17 @@ export default class SprintManagement extends AIUXWidgetElement {
           </div>
           <div class="aiux-card-body p-0">
             <div class="flex flex-col gap-3 border-b border-base-300 p-4 sm:flex-row sm:items-end">
-              <label class="flex min-w-48 flex-1 flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Search sprints')}</span><input class="aiux-input aiux-input-bordered aiux-input-sm" type="search" .value=${this.searchTerm} @input=${event => { this.searchTerm = event.currentTarget.value; this.page = 1; }} placeholder=${i18n.getMessage('Search by sprint name')} /></label>
-              <label class="flex flex-col gap-1 sm:min-w-48"><span class="text-sm font-medium">${i18n.getMessage('Status')}</span><select class="aiux-select aiux-select-bordered aiux-select-sm" .value=${this.statusFilter} @change=${event => { this.statusFilter = event.currentTarget.value; this.page = 1; }}><option value="">${i18n.getMessage('All statuses')}</option><option value="-6">${i18n.getMessage('Draft')}</option><option value="1">${i18n.getMessage('Planning')}</option><option value="2">${i18n.getMessage('Current')}</option><option value="3">${i18n.getMessage('Complete')}</option><option value="4">${i18n.getMessage('Cancelled')}</option></select></label>
+              <label class="flex min-w-48 flex-1 flex-col gap-1"><span class="text-sm font-medium">${i18n.getMessage('Search sprints')}</span><input class="aiux-input aiux-input aiux-input-sm" type="search" .value=${this.searchTerm} @input=${event => { this.searchTerm = event.currentTarget.value; this.page = 1; }} placeholder=${i18n.getMessage('Search by sprint name')} /></label>
+              <label class="flex flex-col gap-1 sm:min-w-48"><span class="text-sm font-medium">${i18n.getMessage('Status')}</span><select class="aiux-select aiux-select aiux-select-sm" .value=${this.statusFilter} @change=${event => { this.statusFilter = event.currentTarget.value; this.page = 1; }}><option value="">${i18n.getMessage('All statuses')}</option><option value="-6">${i18n.getMessage('Draft')}</option><option value="1">${i18n.getMessage('Planning')}</option><option value="2">${i18n.getMessage('Current')}</option><option value="3">${i18n.getMessage('Complete')}</option><option value="4">${i18n.getMessage('Cancelled')}</option></select></label>
             </div>
-            ${this.loading ? html`<div class="flex items-center gap-3 p-8" role="status"><span class="aiux-loading aiux-loading-spinner aiux-loading-sm" aria-hidden="true"></span><span>${i18n.getMessage('Loading sprints…')}</span></div>`
+            ${this.loading ? html`<div class="w-full p-6 space-y-3" role="status" aria-label=${i18n.getMessage('Loading sprints…')}>
+              <div class="aiux-skeleton h-10 w-full rounded"></div>
+              <div class="aiux-skeleton h-12 w-full rounded"></div>
+              <div class="aiux-skeleton h-12 w-full rounded"></div>
+              <div class="aiux-skeleton h-12 w-full rounded"></div>
+              <div class="aiux-skeleton h-12 w-full rounded"></div>
+              <span class="sr-only">${i18n.getMessage('Loading sprints…')}</span>
+            </div>`
               : filteredSprints.length === 0 ? html`<div class="flex flex-col items-center gap-2 p-8 text-center" role="status"><h3 class="text-base font-semibold">${i18n.getMessage('No sprints found')}</h3><p class="max-w-md text-sm text-base-content/60">${this.searchTerm || this.statusFilter ? i18n.getMessage('Try changing or clearing the search and status filters.') : i18n.getMessage('Create a sprint for one of your Agile Team groups to get started.')}</p></div>`
               : html`<div class="w-full overflow-x-auto"><table class="aiux-table aiux-table-md w-full min-w-[1200px] table-fixed text-base">
                   <caption class="sr-only">${i18n.getMessage('Sprints in your Agile Team groups, with start and end dates, status, and lifecycle actions')}</caption>
@@ -417,38 +451,41 @@ export default class SprintManagement extends AIUXWidgetElement {
                   <thead><tr>${this.sortHeader('name', i18n.getMessage('Sprint'))}${this.sortHeader('start_date', i18n.getMessage('Start date and time'))}${this.sortHeader('end_date', i18n.getMessage('End date and time'))}${this.sortHeader('state_label', i18n.getMessage('Status'))}${this.sortHeader('team_points', i18n.getMessage('Group capacity points'))}${this.sortHeader('committed_points', i18n.getMessage('Total committed points'))}${this.sortHeader('story_points', i18n.getMessage('Current scope points'))}${this.sortHeader('actual_points', i18n.getMessage('Completed points'))}<th scope="col" class="px-3 py-2 text-base font-semibold">${i18n.getMessage('Actions')}</th></tr></thead>
                   <tbody>${visibleSprints.map(sprint => html`
                     <tr>
-                      <th scope="row"><span class="block font-medium">${sprint.name}</span></th>
+                      <th scope="row"><button class="aiux-btn aiux-btn-link h-auto min-h-0 p-0 text-base font-medium" type="button" aria-label=${i18n.getMessage('Open sprint {0}', [sprint.name])} @click=${() => this.openSprint(sprint.sys_id)}>${sprint.name}</button></th>
                       <td><time>${sprint.start_date}</time></td>
                       <td><time>${sprint.end_date}</time></td>
                       <td><span class="aiux-badge aiux-badge-md ${this.statusClass(sprint.state)} aiux-badge-outline text-sm">${sprint.state_label}</span></td>
                       <td class="text-center align-middle tabular-nums">${sprint.state === '-6'
                         ? this.editingCapacityId === sprint.sys_id
-                          ? html`<div class="inline-flex min-w-36 items-center justify-center gap-2"><input class="aiux-input aiux-input-bordered aiux-input-sm w-24 text-center tabular-nums" type="number" min="0" step="any" .value=${sprint.team_points} data-capacity-input=${sprint.sys_id} aria-label=${i18n.getMessage('Group capacity points for {0}', [sprint.name])} ?disabled=${Boolean(this.actionId)} /><button class="aiux-btn aiux-btn-light aiux-btn-sm aiux-btn-circle" type="button" data-id=${sprint.sys_id} aria-label=${i18n.getMessage('Save group capacity points for {0}', [sprint.name])} ${tooltip({content: i18n.getMessage('Save capacity points')})} @click=${this.updateCapacity} ?disabled=${Boolean(this.actionId)}>${icon({name: 'check-outline', size: 'sm', class: 'text-success'})}</button><button class="aiux-btn aiux-btn-light aiux-btn-sm aiux-btn-circle" type="button" aria-label=${i18n.getMessage('Cancel editing group capacity points for {0}', [sprint.name])} ${tooltip({content: i18n.getMessage('Cancel editing')})} @click=${this.cancelCapacityEdit} ?disabled=${Boolean(this.actionId)}>${icon({name: 'close-outline', size: 'sm', class: 'text-error'})}</button></div>`
-                          : html`<button class="aiux-btn aiux-btn-ghost aiux-btn-sm h-auto min-h-0 px-2 py-0 text-base leading-normal" type="button" aria-label=${i18n.getMessage('Group capacity points for {0}: {1}. Double-click to edit.', [sprint.name, sprint.team_points])} title=${i18n.getMessage('Double-click to edit')} @dblclick=${() => this.beginCapacityEdit(sprint.sys_id)} @keydown=${event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.beginCapacityEdit(sprint.sys_id); } }}>${sprint.team_points}</button>`
-                        : sprint.team_points}</td>
-                      <td class="text-center align-middle tabular-nums">${sprint.committed_points}</td>
-                      <td class="text-center align-middle tabular-nums">${sprint.story_points}</td>
-                      <td class="text-center align-middle tabular-nums">${sprint.actual_points}</td>
-                      <td>${sprint.state === '2'
-                        ? html`<button class="aiux-btn aiux-btn-primary aiux-btn-md" data-id=${sprint.sys_id} data-action="complete" aria-label=${i18n.getMessage('Complete {0}', [sprint.name])} @click=${this.changeState} ?disabled=${Boolean(this.actionId)}>${this.actionId === sprint.sys_id ? i18n.getMessage('Saving…') : i18n.getMessage('Complete sprint')}</button>`
-                        : sprint.state === '-6' || sprint.state === '1'
+                          ? html`<div class="inline-flex min-w-36 items-center justify-center gap-2"><input class="aiux-input aiux-input aiux-input-sm w-24 text-center tabular-nums" type="number" min="0" step="any" .value=${sprint.team_points} data-capacity-input=${sprint.sys_id} aria-label=${i18n.getMessage('Group capacity points for {0}', [sprint.name])} ?disabled=${Boolean(this.actionId)} /><button class="aiux-btn aiux-btn-light aiux-btn-sm aiux-btn-circle" type="button" data-id=${sprint.sys_id} aria-label=${i18n.getMessage('Save group capacity points for {0}', [sprint.name])} ${tooltip({content: i18n.getMessage('Save capacity points')})} @click=${this.updateCapacity} ?disabled=${Boolean(this.actionId)}>${icon({name: 'check', size: 'sm', class: 'text-success'})}</button><button class="aiux-btn aiux-btn-light aiux-btn-sm aiux-btn-circle" type="button" aria-label=${i18n.getMessage('Cancel editing group capacity points for {0}', [sprint.name])} ${tooltip({content: i18n.getMessage('Cancel editing')})} @click=${this.cancelCapacityEdit} ?disabled=${Boolean(this.actionId)}>${icon({name: 'close', size: 'sm', class: 'text-error'})}</button></div>`
+                          : html`<button class="aiux-btn aiux-btn-ghost aiux-btn-sm h-auto min-h-0 px-2 py-0 text-base leading-normal" type="button" aria-label=${i18n.getMessage('Group capacity points for {0}: {1}. Double-click to edit. Right-click for options.', [sprint.name, sprint.team_points])} title=${i18n.getMessage('Double-click to edit, right-click for options')} @dblclick=${() => this.beginCapacityEdit(sprint.sys_id)} @contextmenu=${event => this.openCapacityContextMenu(event, sprint.sys_id)} @keydown=${event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.beginCapacityEdit(sprint.sys_id); } }}>${sprint.team_points}</button>`
+                          : sprint.team_points}</td>
+                          <td class="text-center align-middle tabular-nums">${sprint.committed_points}</td>
+                          <td class="text-center align-middle tabular-nums">${sprint.story_points}</td>
+                          <td class="text-center align-middle tabular-nums">${sprint.actual_points}</td>
+                          <td>${sprint.state === '2'
+                          ? html`<button class="aiux-btn aiux-btn-primary aiux-btn-md" data-id=${sprint.sys_id} data-action="complete" aria-label=${i18n.getMessage('Complete {0}', [sprint.name])} @click=${this.changeState} ?disabled=${Boolean(this.actionId)}>${this.actionId === sprint.sys_id ? i18n.getMessage('Saving…') : i18n.getMessage('Complete sprint')}</button>`
+                          : sprint.state === '-6' || sprint.state === '1'
                           ? html`<button class="aiux-btn aiux-btn-primary aiux-btn-md" data-id=${sprint.sys_id} data-action="start" aria-label=${i18n.getMessage('Start {0}', [sprint.name])} @click=${this.changeState} ?disabled=${Boolean(this.actionId)}>${this.actionId === sprint.sys_id ? i18n.getMessage('Saving…') : i18n.getMessage('Start sprint')}</button>`
                           : html`<span class="text-base text-base-content/50">${i18n.getMessage('No action')}</span>`}</td>
-                    </tr>`
-                  )}</tbody>
-                </table></div>`}
-            ${this.hasMore ? html`<p class="border-t border-base-300 p-4 text-sm text-base-content/70" role="status">${i18n.getMessage('Showing the first {0} sprints. Use the group selector above to narrow the list.', [this.sprints.length])}</p>` : ''}
-            ${filteredSprints.length ? html`
-              <footer class="flex flex-col gap-4 border-t border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <p class="text-sm text-base-content/70" aria-live="polite">${i18n.getMessage('Showing {0}–{1} of {2} sprints', [startIndex + 1, rangeEnd, filteredSprints.length])}</p>
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <label class="flex items-center gap-2 text-sm"><span>${i18n.getMessage('Records per page')}</span><select class="aiux-select aiux-select-bordered aiux-select-sm" .value=${String(this.pageSize)} @change=${event => { this.pageSize = Number(event.currentTarget.value); this.page = 1; }}><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option></select></label>
-                  ${totalPages > 1 ? html`<nav aria-label=${i18n.getMessage('Sprint list pagination')}><aiux-pagination-nav .totalPages=${totalPages} .currentPage=${currentPage} .showFirstLast=${true} .onchange=${event => { this.page = event.detail.page; }}></aiux-pagination-nav></nav>` : ''}
-                </div>
-              </footer>` : ''}
-          </div>
-        </section>
-      </main>
-    `;
+                          </tr>`
+                          )}</tbody>
+                          </table></div>`}
+                          ${this.hasMore ? html`<p class="border-t border-base-300 p-4 text-sm text-base-content/70" role="status">${i18n.getMessage('Showing the first {0} sprints. Use the group selector above to narrow the list.', [this.sprints.length])}</p>` : ''}
+                          ${filteredSprints.length ? html`
+                          <footer class="flex flex-col gap-4 border-t border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <p class="text-sm text-base-content/70" aria-live="polite">${i18n.getMessage('Showing {0}–{1} of {2} sprints', [startIndex + 1, rangeEnd, filteredSprints.length])}</p>
+                          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <label class="flex items-center gap-2 text-sm"><span>${i18n.getMessage('Records per page')}</span><select class="aiux-select aiux-select-sm" .value=${String(this.pageSize)} @change=${event => { this.pageSize = Number(event.currentTarget.value); this.page = 1; }}><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option></select></label>
+                          ${totalPages > 1 ? html`<nav aria-label=${i18n.getMessage('Sprint list pagination')}><aiux-pagination-nav .totalPages=${totalPages} .currentPage=${currentPage} .showFirstLast=${true} .onchange=${event => { this.page = event.detail.page; }}></aiux-pagination-nav></nav>` : ''}
+                          </div>
+                          </footer>` : ''}
+                          </div>
+                          </section>
+                          </main>
+                          <aiux-calculate-group-capacity
+                          .server=${this.server}
+                          @apply=${this.handleCapacityApplied}>
+                          </aiux-calculate-group-capacity>`;
   }
 }

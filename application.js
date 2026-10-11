@@ -12,6 +12,11 @@ export default {
         icon: 'home',
         title: i18n.getMessage('Sprint Planning'),
         action: {type: 'navigate', path: '/home'}
+      },
+      {
+        icon: 'agile',
+        title: i18n.getMessage('Agile Board'),
+        action: {type: 'navigate', path: '/board'}
       }
     ];
 

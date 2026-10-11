@@ -36,7 +36,9 @@ export default [
       'coverage/**',
       'target/**',
       '.types/**',
-      '@types/**'
+      '@types/**',
+      '.claude/**',
+      '.agents/**'
     ]
   },
   js.configs.recommended,
@@ -50,12 +52,13 @@ export default [
       ]
     }
   },
-  // Fluent server-side scripts (business rules, flow actions) — Glide globals
+  // Fluent server-side scripts (business rules, flow actions) and widget server scripts — Glide globals
   {
-    files: ['src/fluent/**/*.js', 'components/**/server-script.js'],
+    files: ['src/fluent/**/*.js', 'components/**/server-script.js', 'widgets/**/server-script.js'],
     languageOptions: {
       globals: {
         GlideRecord: 'readonly',
+        GlideRecordSecure: 'readonly',
         GlideAggregate: 'readonly',
         GlideDateTime: 'readonly',
         GlideSystem: 'readonly',
